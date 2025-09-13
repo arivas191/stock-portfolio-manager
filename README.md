@@ -10,8 +10,13 @@ A Python application for managing stock portfolios and retrieving historical pri
 - Command-line interface for easy interaction
 
 ## Usage
-Install dependencies and run:
+Create and activate a virtual environment, install dependencies, then run:
+
 ```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
 python stock_portfolio.py
 ```
 
