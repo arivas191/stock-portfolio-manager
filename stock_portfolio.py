@@ -49,7 +49,8 @@ def ensure_schema(conn):
         CREATE TABLE IF NOT EXISTS portfolios (
           id INT AUTO_INCREMENT PRIMARY KEY,
           name VARCHAR(128) NOT NULL,
-          creation_date DATETIME NOT NULL
+          creation_date DATETIME NOT NULL,
+          current_value DOUBLE
         ) ENGINE=InnoDB
         """
     )
@@ -58,6 +59,7 @@ def ensure_schema(conn):
         CREATE TABLE IF NOT EXISTS portfolio_stocks (
           portfolio_id INT NOT NULL,
           ticker VARCHAR(16) NOT NULL,
+          shares DOUBLE,
           PRIMARY KEY (portfolio_id, ticker),
           FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
         ) ENGINE=InnoDB
