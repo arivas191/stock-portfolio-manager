@@ -54,6 +54,10 @@ def run_simulation(portfolio_name: str, initial_investment: float):
     df = df[(df['Date'] >= test_start) & (df['Date'] <= test_end)]
     df = df.sort_values(['Date', 'Ticker'])
 
+
+    # Shift SIGNAL forward so today's trade is based on next day's signal
+    df['Next_Signal'] = df.groupby('Ticker')['SIGNAL'].shift(-1)
+
     # Simulation loop
     daily_values = []
     for date, group in df.groupby('Date'):
@@ -64,20 +68,23 @@ def run_simulation(portfolio_name: str, initial_investment: float):
             ticker = row_data['Ticker']
             if ticker not in portfolio:
                 continue
-            signal = row_data['SIGNAL'].lower()
-            price = row_data['Close']  # execution price for the trade
+            signal = row_data['Next_Signal']  # use next day's signal
+            if pd.isna(signal):
+                continue
+            signal = signal.lower()
+            execution_price = row_data['Close']  # execute at today's close
 
             if signal == 'increase':
-                buys.append((ticker, price))
+                buys.append((ticker, execution_price))
             elif signal == 'decrease' and portfolio[ticker] > 0:
-                sells.append((ticker, price))
+                sells.append((ticker, execution_price))
 
-        # Execute sells first
+        # Execute sells
         for ticker, price in sells:
             cash += portfolio[ticker] * price
             portfolio[ticker] = 0
 
-        # Execute buys: simple allocation (e.g., equal fraction of cash to each buy signal)
+        # Execute buys
         if buys and cash > 0:
             fraction_per_stock = cash / len(buys)
             for ticker, price in buys:
@@ -86,14 +93,13 @@ def run_simulation(portfolio_name: str, initial_investment: float):
                     portfolio[ticker] += shares_to_buy
                     cash -= shares_to_buy * price
 
-        # Update DB: shares and portfolio value
-        for ticker, shares in portfolio.items():
-            cur.execute("UPDATE portfolio_stocks SET shares=%s WHERE portfolio_id=%s AND ticker=%s",
-                        (shares, pid, ticker))
-
-        total_value = cash + sum(portfolio[t] * group[group['Ticker']==t]['Close'].iloc[0] for t in portfolio)
+        # Portfolio valuation at close
+        total_value = cash + sum(portfolio[t] * group[group['Ticker']==t]['Close'].iloc[0] for t in portfolio if portfolio[t] > 0)
         daily_values.append(total_value)
+        for ticker, shares in portfolio.items():
+            cur.execute("UPDATE portfolio_stocks SET shares=%s WHERE portfolio_id=%s AND ticker=%s", (shares, pid, ticker))
         cur.execute("UPDATE portfolios SET current_value=%s WHERE id=%s", (total_value, pid))
+
 
     conn.close()
     # print(f"Simulation complete. Final portfolio value: {total_value:.2f}, Cash: {cash:.2f}")
@@ -101,8 +107,6 @@ def run_simulation(portfolio_name: str, initial_investment: float):
     # Use number of simulated trading days, not calendar days
     trading_days = len(daily_values)  # actual trading days from your data
     annualized_return = (final_value / initial_investment - 1) * (252 / trading_days)
-
-
 
     returns = np.diff(daily_values) / daily_values[:-1]  # daily returns
     sharpe_ratio = (np.mean(returns) / np.std(returns)) * np.sqrt(252) if np.std(returns) != 0 else 0
