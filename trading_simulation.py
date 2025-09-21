@@ -79,11 +79,6 @@ def run_simulation(portfolio_name: str, initial_investment: float):
             elif signal == 'decrease' and portfolio[ticker] > 0:
                 sells.append((ticker, execution_price))
 
-        # Execute sells
-        for ticker, price in sells:
-            cash += portfolio[ticker] * price
-            portfolio[ticker] = 0
-
         # Execute buys
         if buys and cash > 0:
             fraction_per_stock = cash / len(buys)
@@ -92,6 +87,11 @@ def run_simulation(portfolio_name: str, initial_investment: float):
                 if shares_to_buy > 0:
                     portfolio[ticker] += shares_to_buy
                     cash -= shares_to_buy * price
+
+        # Execute sells
+        for ticker, price in sells:
+            cash += portfolio[ticker] * price
+            portfolio[ticker] = 0
 
         # Portfolio valuation at close
         total_value = cash + sum(portfolio[t] * group[group['Ticker']==t]['Close'].iloc[0] for t in portfolio if portfolio[t] > 0)
