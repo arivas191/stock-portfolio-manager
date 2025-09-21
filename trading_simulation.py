@@ -12,7 +12,7 @@ DB_PASS = "root"
 DB_NAME = "stock"
 
 # Excel file with predictions
-EXCEL_FILE = "prices_prediction_arima.xlsx"
+CSV_FILE = "prices_prediction.csv"
 
 def db_connection():
     """Return a MySQL DB connection."""
@@ -42,10 +42,10 @@ def run_simulation(portfolio_name: str, initial_investment: float):
     cur.execute("UPDATE portfolios SET current_value=%s WHERE id=%s", (initial_investment, pid))
     cur.execute("UPDATE portfolio_stocks SET shares = 0 WHERE portfolio_id = %s", (pid,))
 
-    # Read predictions from Excel
-    df = pd.read_excel(EXCEL_FILE)
+    # Read predictions from csv
+    df = pd.read_csv(CSV_FILE)
     # Ignore rows with missing prediction/signal
-    df = df.dropna(subset=['ARIMA_PRED', 'SIGNAL'])
+    df = df.dropna(subset=['PREDICTION', 'SIGNAL'])
     df['Date'] = pd.to_datetime(df['Date']).dt.date
 
     # Filter to test period
@@ -98,8 +98,11 @@ def run_simulation(portfolio_name: str, initial_investment: float):
     conn.close()
     # print(f"Simulation complete. Final portfolio value: {total_value:.2f}, Cash: {cash:.2f}")
     final_value = total_value
-    days = (test_end - test_start).days
-    annualized_return = (final_value / initial_investment) ** (365 / days) - 1
+    # Use number of simulated trading days, not calendar days
+    trading_days = len(daily_values)  # actual trading days from your data
+    annualized_return = (final_value / initial_investment - 1) * (252 / trading_days)
+
+
 
     returns = np.diff(daily_values) / daily_values[:-1]  # daily returns
     sharpe_ratio = (np.mean(returns) / np.std(returns)) * np.sqrt(252) if np.std(returns) != 0 else 0
